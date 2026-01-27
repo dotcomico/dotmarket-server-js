@@ -2,6 +2,7 @@ import Order from '../models/Order.js';
 import OrderItem from '../models/OrderItem.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
+import sequelize from '../config/database.js';
 import { ROLES, ORDER_STATUS } from '../config/constants.js';
 
 // Get all orders (Admin sees all, Customers see only their own)
@@ -10,7 +11,6 @@ export const getAllOrders = async (req, res) => {
     let orders;
 
     if (req.user.role === ROLES.ADMIN || req.user.role === ROLES.MANAGER) {
-      // Admin/Manager sees all orders
       orders = await Order.findAll({
         include: [
           { model: User, attributes: ['id', 'username', 'email'] },
@@ -22,7 +22,6 @@ export const getAllOrders = async (req, res) => {
         order: [['createdAt', 'DESC']]
       });
     } else {
-      // Customer sees only their orders
       orders = await Order.findAll({
         where: { UserId: req.user.id },
         include: [
@@ -59,7 +58,6 @@ export const getOrderById = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Check authorization: Only order owner or admin/manager can view
     if (
       req.user.role !== ROLES.ADMIN && 
       req.user.role !== ROLES.MANAGER && 
@@ -77,43 +75,50 @@ export const getOrderById = async (req, res) => {
 
 // Create new order (Checkout)
 export const createOrder = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
   try {
-    const { items, address } = req.body; // items: [{ productId, quantity }]
+    const { items, address } = req.body;
 
     if (!items || items.length === 0) {
+      await transaction.rollback();
       return res.status(400).json({ message: 'Order must contain at least one item' });
     }
 
     let totalAmount = 0;
     const orderItems = [];
+    const productsToUpdate = [];
 
     // Validate products and calculate total
     for (const item of items) {
-      const product = await Product.findByPk(item.productId);
+      const product = await Product.findByPk(item.productId, { transaction });
 
       if (!product) {
+        await transaction.rollback();
         return res.status(404).json({ 
           message: `Product with ID ${item.productId} not found` 
         });
       }
 
       if (product.stock < item.quantity) {
+        await transaction.rollback();
         return res.status(400).json({ 
           message: `Insufficient stock for ${product.name}. Available: ${product.stock}` 
         });
       }
 
-      const itemTotal = product.price * item.quantity;
-      totalAmount += itemTotal;
+      totalAmount += product.price * item.quantity;
 
       orderItems.push({
-        productId: product.id,
+        ProductId: item.productId,
         quantity: item.quantity,
         priceAtPurchase: product.price
       });
 
-      // Reduce stock
-      await product.update({ stock: product.stock - item.quantity });
+      productsToUpdate.push({
+        product,
+        newStock: product.stock - item.quantity
+      });
     }
 
     // Create the order
@@ -122,17 +127,25 @@ export const createOrder = async (req, res) => {
       totalAmount,
       address,
       status: ORDER_STATUS.PENDING
-    });
+    }, { transaction });
 
-    // Create order items (bulk insert - faster and safer)
+    // Create order items with OrderId
     const orderItemsToCreate = orderItems.map(item => ({
       OrderId: order.id,
-      ProductId: item.productId,
+      ProductId: item.ProductId,
       quantity: item.quantity,
       priceAtPurchase: item.priceAtPurchase
     }));
 
-    await OrderItem.bulkCreate(orderItemsToCreate);
+    await OrderItem.bulkCreate(orderItemsToCreate, { transaction });
+
+    // Update product stock
+    for (const { product, newStock } of productsToUpdate) {
+      await product.update({ stock: newStock }, { transaction });
+    }
+
+    // Commit transaction
+    await transaction.commit();
 
     // Fetch complete order with products
     const completeOrder = await Order.findByPk(order.id, {
@@ -148,7 +161,9 @@ export const createOrder = async (req, res) => {
       message: 'Order created successfully',
       order: completeOrder
     });
+
   } catch (error) {
+    await transaction.rollback();
     console.error('Create order error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -171,9 +186,19 @@ export const updateOrderStatus = async (req, res) => {
 
     await order.update({ status });
 
+    const updatedOrder = await Order.findByPk(order.id, {
+      include: [
+        { model: User, attributes: ['id', 'username', 'email'] },
+        { 
+          model: Product,
+          through: { attributes: ['quantity', 'priceAtPurchase'] }
+        }
+      ]
+    });
+
     res.json({
       message: 'Order status updated successfully',
-      order
+      order: updatedOrder
     });
   } catch (error) {
     console.error('Update order status error:', error);
@@ -190,9 +215,7 @@ export const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Delete associated OrderItems first (cascade might handle this)
     await OrderItem.destroy({ where: { OrderId: order.id } });
-    
     await order.destroy();
 
     res.json({ message: 'Order deleted successfully' });
