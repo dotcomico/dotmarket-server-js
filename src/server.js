@@ -69,6 +69,8 @@ const startServer = async () => {
     await connectDB();
 
     // Sync database (creates tables if they don't exist)
+    // await sequelize.query('DROP TABLE IF EXISTS OrderItems');
+    // await sequelize.sync({ force: false });
     await sequelize.sync({
       alter: process.env.NODE_ENV === 'development',
       force: false
