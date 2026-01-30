@@ -68,9 +68,13 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    // Sync database (creates tables if they don't exist)
-    // await sequelize.query('DROP TABLE IF EXISTS OrderItems');
-    // await sequelize.sync({ force: false });
+    //   try {
+    //   await sequelize.query('ALTER TABLE Products ADD COLUMN image360 VARCHAR(255)');
+    //   console.log('✅ image360 column added');
+    // } catch (e) {
+    //   // Column already exists, ignore
+    // }
+    // In server startup
     await sequelize.sync({
       alter: process.env.NODE_ENV === 'development',
       force: false

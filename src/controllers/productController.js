@@ -99,19 +99,18 @@ export const getProductById = async (req, res) => {
   }
 };
 
-// Create new product (validation already in route)
+// Create new product
 export const createProduct = async (req, res) => {
   try {
     const { name, categoryId, description, price, stock } = req.body;
-
-    // Verify category exists
     const category = await Category.findByPk(categoryId);
     if (!category) {
       return res.status(400).json({ message: 'Invalid category ID' });
     }
 
-    // Get image path if uploaded
-    const image = req.file ? `/uploads/${req.file.filename}` : null;
+    // Handle both image uploads
+    const image = req.files?.image?.[0] ? `/uploads/${req.files.image[0].filename}` : null;
+    const image360 = req.files?.image360?.[0] ? `/uploads/${req.files.image360[0].filename}` : null;
 
     const newProduct = await Product.create({
       name,
@@ -119,10 +118,10 @@ export const createProduct = async (req, res) => {
       description,
       price: parseFloat(price),
       stock: parseInt(stock) || 0,
-      image
+      image,
+      image360
     });
 
-    // Fetch complete product with category
     const completeProduct = await Product.findByPk(newProduct.id, {
       include: { model: Category, as: 'category' }
     });
@@ -137,7 +136,7 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// Update product (validation in route)
+// Update product
 export const updateProduct = async (req, res) => {
   try {
     const { name, categoryId, description, price, stock } = req.body;
@@ -147,7 +146,6 @@ export const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Verify category if being updated
     if (categoryId) {
       const category = await Category.findByPk(categoryId);
       if (!category) {
@@ -155,7 +153,6 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Prepare update data
     const updateData = {
       name: name || product.name,
       categoryId: categoryId || product.categoryId,
@@ -164,14 +161,16 @@ export const updateProduct = async (req, res) => {
       stock: stock !== undefined ? parseInt(stock) : product.stock
     };
 
-    // Update image if new one uploaded
-    if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
+    // Handle image uploads
+    if (req.files?.image?.[0]) {
+      updateData.image = `/uploads/${req.files.image[0].filename}`;
+    }
+    if (req.files?.image360?.[0]) {
+      updateData.image360 = `/uploads/${req.files.image360[0].filename}`;
     }
 
     await product.update(updateData);
 
-    // Fetch updated product with category
     const updatedProduct = await Product.findByPk(product.id, {
       include: { model: Category, as: 'category' }
     });

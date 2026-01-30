@@ -1,16 +1,16 @@
 import multer from "multer";
 import path from "path";
 
-// 1. Define where and how to save the file
+//   where & how  save the file
 const storage = multer.diskStorage({
   destination: "public/uploads/",
   filename: (req, file, cb) => {
-    // Create a unique name: timestamp + original extension
+    // Create a unique name
     cb(null, Date.now() + path.extname(file.originalname));
   },
 });
 
-// 2. Filter files (only allow images)
+// Filter files only images
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(

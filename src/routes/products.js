@@ -15,7 +15,13 @@ import {
 
 const router = express.Router();
 
-// Public routes - Anyone can view products
+// multiple images
+const productUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'image360', maxCount: 1 }
+]);
+
+// Public routes
 router.get('/', getAllProducts);
 router.get('/:id', getProductById);
 
@@ -24,7 +30,7 @@ router.post(
   '/', 
   auth, 
   checkRole(ROLES.ADMIN, ROLES.MANAGER), 
-  upload.single('image'),
+  productUpload,
   validateProduct,
   handleValidationErrors,
   createProduct
@@ -34,7 +40,7 @@ router.put(
   '/:id', 
   auth, 
   checkRole(ROLES.ADMIN, ROLES.MANAGER), 
-  upload.single('image'),
+  productUpload,
   validateProduct,
   handleValidationErrors,
   updateProduct
