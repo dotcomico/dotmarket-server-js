@@ -2,7 +2,7 @@ import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
-import logger from '../utils/logger.js'; 
+import logger from '../utils/logger.js';
 
 // Validation middleware
 export const validateProduct = [
@@ -125,7 +125,7 @@ export const createProduct = async (req, res) => {
       image,
       image360
     });
-    
+
     logger.info('Product created', { productId: newProduct.id, name });
 
     const completeProduct = await Product.findByPk(newProduct.id, {
@@ -171,14 +171,14 @@ export const updateProduct = async (req, res) => {
     };
 
     // Handle main image
-    if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
+    if (req.files?.image?.[0]) {
+      updateData.image = `/uploads/${req.files.image[0].filename}`;
     } else if (removeImage === 'true') {
       updateData.image = null;
     }
-
-    // Handle 360° image removal
-    if (removeImage360 === 'true') {
+    if (req.files?.image360?.[0]) {
+      updateData.image360 = `/uploads/${req.files.image360[0].filename}`;
+    } else if (removeImage360 === 'true') {
       updateData.image360 = null;
     }
 
@@ -209,7 +209,7 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    const productId = product.id; 
+    const productId = product.id;
     await product.destroy();
     logger.info('Product deleted', { productId });
 

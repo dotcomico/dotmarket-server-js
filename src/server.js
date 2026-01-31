@@ -5,15 +5,11 @@ import { connectDB, sequelize } from './config/database.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
-
-// Import models to establish associations
 import './models/User.js';
 import './models/Product.js';
 import './models/Order.js';
 import './models/OrderItem.js';
 import './config/associations.js';
-
-// Import routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import productRoutes from './routes/products.js';
@@ -39,8 +35,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
 
 // Routes
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'development' ? 1000 : 100, 
+  message: "Too many requests from this IP, please try again after 15 minutes",
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 app.use('/api/auth', authRoutes);
