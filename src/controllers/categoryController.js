@@ -56,10 +56,7 @@ export const getAllCategories = async (req, res) => {
   }
 };
 
-/**
- * Get all products for a category and its children (recursive)
- * GET /api/categories/:slug/products
- */
+
 export const getProductsByCategory = async (req, res) => {
   try {
     const { slug } = req.params;
@@ -144,10 +141,7 @@ export const getProductsByCategory = async (req, res) => {
   }
 };
 
-/**
- * Get category details with breadcrumb
- * GET /api/categories/:slug
- */
+
 export const getCategoryBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
